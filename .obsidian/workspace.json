@@ -4,16 +4,16 @@
     "type": "split",
     "children": [
       {
-        "id": "010779aebb37e8ed",
+        "id": "64ee60ad320ee1aa",
         "type": "tabs",
         "children": [
           {
-            "id": "98b2342c66a8e62c",
+            "id": "47c74633f1ce5005",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "rich/etf/网格交易.md",
+                "file": "weekly-log/提问是为了让别人为你做决策.md",
                 "mode": "source",
                 "source": false
               }
@@ -85,7 +85,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "rich/etf/网格交易.md",
+                "file": "weekly-log/提问是为了让别人为你做决策.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -102,7 +102,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "rich/etf/网格交易.md",
+                "file": "weekly-log/提问是为了让别人为你做决策.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -125,7 +125,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "rich/etf/网格交易.md"
+                "file": "weekly-log/提问是为了让别人为你做决策.md"
               }
             }
           }
@@ -146,8 +146,10 @@
       "command-palette:打开命令面板": false
     }
   },
-  "active": "98b2342c66a8e62c",
+  "active": "47c74633f1ce5005",
   "lastOpenFiles": [
+    "rich/etf/网格交易.md",
+    "weekly-log/提问是为了让别人为你做决策.md",
     "未命名.canvas",
     "2022-12-28.md",
     "2022-09-13.md"
