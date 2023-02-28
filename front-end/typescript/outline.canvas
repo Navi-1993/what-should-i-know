@@ -1,0 +1,16 @@
+{
+	"nodes":[
+		{"type":"text","text":"基础类型\n- Boolean\n- Number\n- String\n- Array\n- Enum\n- Any\n- Unkonwn\n- Tunple\n- Void\n- Null\n- Undefined\n- Never","id":"c118fee3c7bdbdae","x":-300,"y":-140,"width":250,"height":400,"color":"6"},
+		{"id":"54ac4a033ef09160","x":-300,"y":-440,"width":250,"height":230,"color":"6","type":"text","text":"类型守卫\n- in 关键字\n- typeof 关键字\n- instanceof 关键字\n- 自定义类型保护的类型微词"},
+		{"id":"cc73ac2e92471d43","x":40,"y":-440,"width":420,"height":1260,"color":"6","type":"link","url":"https://www.typescriptlang.org/"},
+		{"id":"a6dc9afe47ae4c69","x":-300,"y":340,"width":250,"height":230,"color":"6","type":"text","text":"泛型：\n- 泛型接口\n- 泛型类\n- 泛型变量\n- 泛型工具类型"},
+		{"type":"text","text":"装饰器：\n- 类装饰器\n- 属性装饰器\n- 方法装饰器\n- 参数装饰器","id":"93a7764ac210e32c","x":-300,"y":640,"width":250,"height":180,"color":"6"},
+		{"type":"text","text":"数组：\n- 数组解构\n- 数组展开运算符\n- 数组遍历\n","id":"51e75160b6bfa2ca","x":560,"y":-440,"width":250,"height":230,"color":"6"},
+		{"type":"text","text":"编译上下文：\n- tsconfig.json 作用\n- tsconfig.json 的重要字段\n- compilerOptions 选项","id":"6e82b689744ba321","x":40,"y":-680,"width":420,"height":180,"color":"6"},
+		{"type":"text","text":"对象：\n- 对象解构\n- 对象展开运算符","id":"774c4167b13920fb","x":560,"y":-140,"width":250,"height":230,"color":"6"},
+		{"type":"text","text":"函数：\n- js 函数与 ts 函数的区别\n- 箭头函数\n- 参数类型与返回类型\n- 函数类型\n- 可选参数与默认参数\n- 剩余参数\n- 函数重载","id":"78b840c81c6187bf","x":560,"y":540,"width":250,"height":280,"color":"6"},
+		{"type":"text","text":"接口：\n- 对象的形状\n- 可读/只读属性","id":"e9b252eaa28b73ef","x":560,"y":170,"width":250,"height":230,"color":"6"},
+		{"type":"text","text":"联合类型与类型别名\n- 联合类型\n- 可识别联合\n- 类型别名","id":"0f5349903f92db9f","x":-640,"y":-440,"width":250,"height":230,"color":"6"}
+	],
+	"edges":[]
+}
