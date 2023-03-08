@@ -1,0 +1,238 @@
+在实际业务中，经常会遇到间隔多少秒或多少分钟执行一遍业务逻辑的情况。每个页面都可能散落着 `setInterval` 这种代码片段，它简单也易于理解，但这种代码一多，但实际上在js 运行中会产生许多个 `interval task`，这时候你如果留意 cpu 的资源占用，会发现随着 `interval task` 增多，`cpu` 资源被更多的占用，从而导致卡顿的情况。
+
+比较常见的业务场景有电商列表，每个组件都有自己独立的 tick 在进行更新倒计时，每 0.1 秒更新 item1 的 price，每 1 秒更新一次 item2 的 price，每 1 分钟更新 item3的库存，等等。如果 `interval` 运用不合理，就会导致页面性能低下的情况。
+
+故抽空做此设计，让全局只有一个精确度为 0.1 秒的定时循环任务在执行，在这个循环中管理所有定时任务的添加，执行与移除。减少 cpu 的占用，优化性能，解决这种容易被忽略的问题。
+
+  
+
+**具体的性能差异可以看下面的实际运行对比**
+
+-   当有 5 万个 `setInterval` 1000 毫秒定时任务处理 1+1 这种算数运算时的 cpu 消耗，此时 cpu 占用 31%上下浮动，但页面渲染缓慢，交互也会卡顿
+
+![](https://wiki.corp.ifanr.com/download/attachments/199721150/image-2023-3-8_15-23-26.png?version=1&modificationDate=1678260206702&api=v2 "王雪峰 > 定时任务管理器 Ticker > image-2023-3-8_15-23-26.png")
+
+-   当有 5 万个 Ticker[1000].eventQueue 间隔 1 秒处理 1 + 1 这种算数运算时的 cpu 消耗，此时 cpu 占用 0.2%浮动
+
+![](https://wiki.corp.ifanr.com/download/attachments/199721150/image-2023-3-8_15-19-57.png?version=1&modificationDate=1678259997867&api=v2 "王雪峰 > 定时任务管理器 Ticker > image-2023-3-8_15-19-57.png")
+
+  
+
+___
+
+### 设计思路：
+
+**循环的核心： engine**
+
+**engine 的协议**
+
+考虑到 `JavaScript` 的运行环境不一定都是浏览器 或 `node`，也有一些定制的运行时，所以抽象出了 `engine` 这个概念。
+
+`engine` 将作为循环的核心 `api`，在 `Ticker` 运行过程中，不断地递归 `engine`。
+
+`engine` 是可以更换的，但它需要满足一些标准，在这里我们以 `setTimeout` 与 `window.requestAnimationFrame` 的函数签名作为规范
+
+1.  `engine` 是一个 `Function` ，它有 1 个必填参数及一到多个可选参数
+    1.  必填参数需要是个 `Function`
+2.  `engine` 执行后需要返回一个从 0 开始自增的整数 id
+
+```ts
+property) Ticker.#engine: ((handler: TimerHandler, timeout?: number | undefined, ...arguments: any[]) => number) & ((callback: FrameRequestCallback) => number)
+```
+(
+
+  
+
+**在前端业务场景中，定时任务一般分 2 种**
+
+1.  前台任务：指应用正在使用时生效，当网页窗口被最小化，或小程序 `onHide` 时，定时任务就会停下来，这一类统称为前台任务，适合使用 `window.requestAnimationFrame` 这类 api 来做 `Ticker` 的 循坏 `engine`。它会在页面渲染每一帧时运行更新定时器的核心逻辑，当窗口被最小化，不会渲染新的帧，也即不会继续运行更新定时器的核心逻辑。
+2.  持续任务：指应用不区分前后台，只要应用正在运行中，就会持续判断是否需要执行定时任务群，这种适用于使用 `setTimeout` 来作为 `Ticker` 循环的 `engine` 方法，即使处于后台，也会持续运行更新定时器的核心逻辑。
+
+  
+
+**任务队列：matrix**
+
+1.  为了便于获取，减少操作时间，决定以 `object` 作为容器，定时任务的间隔时间 `interval` 作为容器的 `key`。每有对应 `interval` 的 定时任务 `task` 就添加到对应 `object[interval].queue `中，故描述它的数据类型为：
+
+```ts
+type Matrix = {
+	[key: string]: {
+		queue: Function[]
+	}
+}
+```
+
+
+  
+
+**循环中判断是否执行定时任务**
+
+我们已经确定默认使用 `setTimeout` 作为循环的核心，每次 `setTimeout` 执行完毕都会再执行递归 `setTimeout`，从而保证全局运行中的定时器只有 1 个 `setTimeout`。（当实例 Ticker 使用的 `engine` 是 `requestAnimationFrame` 时则是以帧执行循环，大概是 `16.66ms`，视设备屏幕的刷新率与软件容器允许的刷新率决定）
+
+每次执行 `setTimeout` 任务，都会获取当前时间 `now`，若 `now - object[interval].updateTime >= interval` 则应该执行 `object[interval].queue` 中的所有任务，并更新 `object[interval].updateTime`
+
+  
+
+**循环休眠**
+
+这里倒是没太多赘述的，功能与逻辑很简单。
+
+1.  在需要让 `Ticker` 休息一段时间时，`clearTimeout` 这个唯一的定时器
+2.  等待一段时间
+3.  让 `Ticker` 继续 `run`
+
+  
+
+  
+
+**指定的定时任务休眠**
+
+当需要让指定任务在睡眠多少秒后再执行时，需要为这个定时任务对象配置一个 sleep 属性，作用为描述这个定时任务还要睡眠多久再执行
+
+1.  若没有配置则可在循环中继续执行定时任务
+2.  若配置了 `sleep` 则应该进行如下判断与更新
+3.  当 `Ticker` 的 `setTimeout` 执行时，会获取当前设备时间 `now`，并减去对应定时任务的 `interval`，得到 `duration`
+4.  `sleep -= duration`
+5.  判断，若 `sleep <= 0` ，则应该执行该定时任务
+
+  
+
+### canvas 图例解析
+
+todo
+
+  
+
+### 最佳实践
+
+  
+
+  
+
+### 其他建议
+
+1.  若是 **react18+** 或 **vue3+** 等语法，建议是基于该 **Ticker** class 再封装一层, 导出 **useSetTimeout** 与 **useAnimationFrame** 使用
+2.  使用中，可以利用 `es6` 模块的机制，先实例一个 `ticker`，再对其 `export`，达到单例的效果
+```ts
+export const setTimeoutTicker = new Ticker()
+export const animateFrameTicker = new Ticker(window.requestAnimationFrame)
+export const anyLoopEngineTicker = new Ticker(any what you need)
+```
+
+
+  
+
+### 供参考的 hooks
+
+```ts
+import Ticker from '../utils/ticker'
+import type {Event} from '../utils/ticker'
+const ticker = new Ticker()
+
+type UseTick = {
+  fn: Event['fn']
+  interval: ReturnType<Date['getTime']>
+  options?: {
+    sleep?: Event['sleep']
+    leading?: boolean
+  }
+}
+
+export default function useTick(
+  fn: UseTick['fn'],
+  interval: UseTick['interval'],
+  options?: UseTick['options']
+): [() => ReturnType<Ticker['addTickEvent']>, () => ReturnType<Ticker['removeTickEvent']>] {
+  const event = {
+    fn,
+    sleep: options?.sleep,
+  }
+  return [() => ticker.addTickEvent(event, interval), () => ticker.removeTickEvent(event)]
+}
+
+// usage
+import useTick from '../../hooks/use-tick'
+const [run, stop] = useTick(()=>{}, 1000)
+run()
+```
+
+  
+
+### 相关源码
+
+```ts
+import delay from 'delay'
+
+export type InitTickOptions = {}
+export type Time = ReturnType<Date['getTime']>
+export type Event = {
+  fn: () => void
+  sleep?: Time
+}
+
+export default class Ticker {
+  #interval: Time = 100
+  #engine: typeof setTimeout & typeof requestAnimationFrame = setTimeout
+  #destroyer: typeof clearTimeout & typeof cancelAnimationFrame = clearTimeout
+  public engineId: number = 0
+  public eventMatrix: {
+    [key: string]: {
+      eventQueue: Event[]
+      updateTime: Time
+    }
+  } = {}
+  constructor(options?: InitTickOptions) {
+    // options 装填完毕，tick 开始初始化
+    this.run()
+  }
+  // 获取当前设备时间
+  getNow(): Time {
+    return new Date().getTime()
+  }
+  // 添加标记事件
+  addTickEvent(event: Event, interval: Time, leading?: boolean): void {
+    if (leading === true) event.fn() // 若传入的 leading 为 true，在添加任务时会立刻执行一次
+    if (this.eventMatrix[interval]) this.eventMatrix[interval].eventQueue.push(event)
+    else
+      this.eventMatrix[interval] = {
+        eventQueue: [event],
+        updateTime: this.getNow(),
+      }
+  }
+  removeTickEvent(event: Event): void {
+    Object.entries(this.eventMatrix).forEach(([interval, events]) => {
+      const eventIndex = events.eventQueue.findIndex(item => item.fn === event.fn)
+      if (eventIndex !== -1) events.eventQueue.splice(eventIndex, 1)
+      // 结束后检查，若 length = 0 的 interval 队列，则删除对应队列属性，减少 #engine 循环的负担
+      if (events.eventQueue.length === 0) delete this.eventMatrix[interval]
+    })
+  }
+  run(): void {
+    this.engineId = this.#engine(() => {
+      const now = this.getNow()
+      Object.entries(this.eventMatrix).forEach(([interval, events]) => {
+        if (now - events.updateTime >= Number(interval)) {
+          events.eventQueue.forEach(item => {
+            if (typeof item?.sleep === 'number') {
+              // 若存在 sleep，则更新 sleep 时间
+              item.sleep = this.getNow() - events.updateTime
+            }
+            // 若不存在 sleep 或者 sleep 时间已经到了，执行事件
+            if (!item?.sleep || item?.sleep <= 0) item.fn()
+          })
+          events.updateTime = now
+        }
+      })
+      this.run()
+    }, this.#interval)
+  }
+  async sleep(sleepTime: Time) {
+    this.#destroyer(this.engineId)
+    await delay(sleepTime)
+    this.run()
+  }
+  stop() {
+    this.#destroyer(this.engineId)
+  }
+}
+```
