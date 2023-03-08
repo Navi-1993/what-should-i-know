@@ -8,13 +8,13 @@
 
 **具体的性能差异可以看下面的实际运行对比**
 
--   当有 5 万个 `setInterval` 1000 毫秒定时任务处理 1+1 这种算数运算时的 cpu 消耗，此时 cpu 占用 31%上下浮动，但页面渲染缓慢，交互也会卡顿
+-   当有 5 万个 `setInterval` 1000 毫秒定时任务处理 1 + 1 这种算数运算时的 cpu 消耗，此时 cpu 占用 31%上下浮动，但页面渲染缓慢，交互也会卡顿
 
-![](https://wiki.corp.ifanr.com/download/attachments/199721150/image-2023-3-8_15-23-26.png?version=1&modificationDate=1678260206702&api=v2 "王雪峰 > 定时任务管理器 Ticker > image-2023-3-8_15-23-26.png")
+![](https://cloud-minapp-44261.cloud.ifanrusercontent.com/1pZrK3sKkKM61kSF.png)
 
 -   当有 5 万个 Ticker[1000].eventQueue 间隔 1 秒处理 1 + 1 这种算数运算时的 cpu 消耗，此时 cpu 占用 0.2%浮动
 
-![](https://wiki.corp.ifanr.com/download/attachments/199721150/image-2023-3-8_15-19-57.png?version=1&modificationDate=1678259997867&api=v2 "王雪峰 > 定时任务管理器 Ticker > image-2023-3-8_15-19-57.png")
+![](https://cloud-minapp-44261.cloud.ifanrusercontent.com/1pZrK3lGPdeVTVhs.png)
 
   
 
