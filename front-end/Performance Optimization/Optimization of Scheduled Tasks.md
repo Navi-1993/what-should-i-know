@@ -111,16 +111,14 @@ todo
 
 ### 其他建议
 
-1.  若是 **react18+** 或 **vue3+** 等语法，建议是基于该 **Ticker** class 再封装一层, 导出 **useSetTimeout** 与 **useAnimationFrame** 使用
-2.  使用中，可以利用 `es6` 模块的机制，先实例一个 `ticker`，再对其 `export`，达到单例的效果
+- 使用中，可以利用 `es6` 模块的机制，先实例一个 `ticker`，再对其 `export`，达到单例的效果
 ```ts
 export const setTimeoutTicker = new Ticker()
 export const animateFrameTicker = new Ticker(window.requestAnimationFrame)
 export const anyLoopEngineTicker = new Ticker(any what you need)
 ```
 
-
-  
+- 若是 **react18+** 或 **vue3+** 等语法，建议是基于该 **Ticker** class 再封装一层, 导出 **useSetTimeout** 与 **useAnimationFrame** 使用
 
 ### 供参考的 hooks
 
@@ -156,14 +154,104 @@ const [run, stop] = useTick(()=>{}, 1000)
 run()
 ```
 
-  
+- 浏览器的 `Native Window Occlusion` 功能对定时器的功能影响
+
+> Native Window Occlusion is a feature in Google Chrome that allows the browser to intelligently manage the display of windows and tabs on the screen. This feature helps to prevent overlapping of windows and tabs, making it easier for users to navigate and work with multiple tabs and windows simultaneously.
+> When a new window or tab is opened, Chrome automatically checks if it will overlap with any existing windows or tabs on the screen. If it does, Chrome will adjust the position of the new window or tab to prevent overlapping.
+> This feature is especially useful for users who frequently work with multiple tabs and windows open at the same time. It helps to reduce clutter and improve productivity by ensuring that windows and tabs are always displayed in a clear and organized manner.
+
+具体的影响：
+当一个页面 tab 被最小化一段时间，该页面的定时器频率会被降低，如 1000ms 频率的定时器将被降低至 60000ms，页面失活越久，这个降频区间会越大。
+那么当这种时候，定时器就无法按照我们预计的期望工作，导致业务可能出现异常。
+例如 IM 软件的心跳检测，它就需要哪怕设备息屏或网页最小化后仍继续工作，若因为浏览器的 `Occlusion`  导致降频，就会影响 IM 的心跳检测，导致 web socket 断开，IM 也就停止了工作。
+
+针对这种情况，可以考虑使用 `web worker` 创建一个线程，返回一个 `setTimeout` 给 `Ticker` 替换 `engine`。
+
+```js
+// 子线程
+// uniapp 里使用微信小程序的 worker
+// path: static/workers/tick-engine
+worker.onMessage(interval => {
+  const timer = setTimeout(() => worker.postMessage(timer), interval)
+})
+```
+
+```ts
+// 主线程 封装 worker engine 示例
+import Ticker from '../utils/ticker'
+
+function createNewWorker(scriptPath: string) {
+  const worker = wx?.createWorker?.(scriptPath, {
+    useExperimentalWorker: true,
+  })
+  worker?.onProcessKilled(() => {
+    createNewWorker(scriptPath)
+  })
+  return worker
+}
+let worker = createNewWorker('static/workers/tick-engine.js')
+
+const workerEngine = (callback: Function, interval: number) => {
+  let id
+  worker?.postMessage(interval)
+  worker?.onMessage((id: number) => {
+    callback()
+    id = id
+  })
+  return id
+}
+
+const workerTicker = new Ticker({
+  engine: workerEngine as any,
+  destroyer: worker?.terminate,
+})
+```
+
+
+```ts
+// 封装为 hooks
+import Ticker from '../utils/ticker'
+import type {Event} from '../utils/ticker'
+
+type UseWorkerTicker = {
+  fn: Event['fn']
+  interval: ReturnType<Date['getTime']>
+  options?: {
+    sleep?: Event['sleep']
+    leading?: boolean
+  }
+}
+
+export default function useWorkerTicker(
+  fn: UseWorkerTicker['fn'],
+  interval: UseWorkerTicker['interval'],
+  options?: UseWorkerTicker['options']
+): [() => ReturnType<Ticker['addTickEvent']>, () => ReturnType<Ticker['removeTickEvent']>] {
+  const event = {
+    fn,
+    sleep: options?.sleep,
+  }
+  return [() => workerTicker.addTickEvent(event, interval), () => workerTicker.removeTickEvent(event)]
+}
+
+
+// 使用 hooks
+
+import useWorkerTicker from '../../hooks/use-worker-ticker'
+const [run, stop] = useWorkerTicker(()=>{}, 1000)
+run()
+```
 
 ### 相关源码
 
 ```ts
 import delay from 'delay'
 
-export type InitTickOptions = {}
+export type InitTickOptions = {
+  engine?: typeof setTimeout & typeof requestAnimationFrame
+  destroyer?: typeof clearTimeout & typeof cancelAnimationFrame
+  interval?: number
+}
 export type Time = ReturnType<Date['getTime']>
 export type Event = {
   fn: () => void
@@ -183,6 +271,9 @@ export default class Ticker {
   } = {}
   constructor(options?: InitTickOptions) {
     // options 装填完毕，tick 开始初始化
+    this.#engine = options?.engine || this.#engine
+    this.#destroyer = options?.destroyer || this.#destroyer
+    this.#interval = options?.interval || this.#interval
     this.run()
   }
   // 获取当前设备时间
