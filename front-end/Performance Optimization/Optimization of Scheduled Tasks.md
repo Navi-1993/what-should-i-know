@@ -1,4 +1,4 @@
-在实际业务中，经常会遇到间隔多少秒或多少分钟执行一遍业务逻辑的情况。每个页面都可能散落着 `setInterval` 这种代码片段，它简单也易于理解，但这种代码一多，但实际上在js 运行中会产生许多个 `interval task`，这时候你如果留意 cpu 的资源占用，会发现随着 `interval task` 增多，`cpu` 资源被更多的占用，从而导致卡顿的情况。
+在实际业务中，经常会遇到间隔多少秒或多少分钟执行一遍业务逻辑的情况。每个页面都可能散落着 `setInterval` 这种代码片段，它简单也易于理解，但这种代码一多，但实际上在js 运行中会产生许多个 `interval task`，这时候你如果留意 cpu 的资源占用，会发现随着 `interval task` 增多，`cpu` 资源被更多的占用，从而导致卡顿的情况——定时器是过度使用 CPU 的一个来源。
 
 比较常见的业务场景有电商列表，每个组件都有自己独立的 tick 在进行更新倒计时，每 0.1 秒更新 item1 的 price，每 1 秒更新一次 item2 的 price，每 1 分钟更新 item3的库存，等等。如果 `interval` 运用不合理，就会导致页面性能低下的情况。
 
@@ -47,6 +47,7 @@ property) Ticker.#engine: ((handler: TimerHandler, timeout?: number | undefined,
 
 1.  前台任务：指应用正在使用时生效，当网页窗口被最小化，或小程序 `onHide` 时，定时任务就会停下来，这一类统称为前台任务，适合使用 `window.requestAnimationFrame` 这类 api 来做 `Ticker` 的 循坏 `engine`。它会在页面渲染每一帧时运行更新定时器的核心逻辑，当窗口被最小化，不会渲染新的帧，也即不会继续运行更新定时器的核心逻辑。
 2.  持续任务：指应用不区分前后台，只要应用正在运行中，就会持续判断是否需要执行定时任务群，这种适用于使用 `setTimeout` 来作为 `Ticker` 循环的 `engine` 方法，即使处于后台，也会持续运行更新定时器的核心逻辑。
+	1. 但是持续任务也可能因为浏览器的一些功能而导致持续任务不执行，比较常见的有 chrome 的 Native Window Occlusion ，该功能会使浏览器降低定时器的运行频率，这一点将在下文提出具体的解决方案和实践。
 
   
 
@@ -155,6 +156,7 @@ run()
 ```
 
 - 浏览器的 `Native Window Occlusion` 功能对定时器的功能影响
+- (timer-throtting)[https://developer.chrome.com/blog/timer-throttling-in-chrome-88/]
 
 > Native Window Occlusion is a feature in Google Chrome that allows the browser to intelligently manage the display of windows and tabs on the screen. This feature helps to prevent overlapping of windows and tabs, making it easier for users to navigate and work with multiple tabs and windows simultaneously.
 > When a new window or tab is opened, Chrome automatically checks if it will overlap with any existing windows or tabs on the screen. If it does, Chrome will adjust the position of the new window or tab to prevent overlapping.
